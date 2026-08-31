@@ -4,92 +4,96 @@ import React, { useEffect, useRef, useState } from 'react';
 import Navbar from './Navbar';
 
 export default function Hero() {
-  const [isPreloaderDone, setIsPreloaderDone] = useState(false);
-  const [isDismissing, setIsDismissing] = useState(false);
-  const [isTextFaded, setIsTextFaded] = useState(false);
-  const [isCardsVisible, setIsCardsVisible] = useState(false);
+  const [isOpeningRetracted, setIsOpeningRetracted] = useState(false);
+  const [isRevealed, setIsRevealed] = useState(false);
 
-  const pathRef = useRef(null);
-  const cardsRef = useRef(null);
+  const titleRef = useRef(null);
+  const photoRef = useRef(null);
+  const leftCardRef = useRef(null);
+  const rightCardRef = useRef(null);
+  const centerTextRef = useRef(null);
+  const ctaBtnRef = useRef(null);
+
+  const scrollRafId = useRef(null);
 
   useEffect(() => {
     // Check prefers-reduced-motion
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReducedMotion) {
-      setIsPreloaderDone(true);
-      setIsCardsVisible(true);
+      setIsOpeningRetracted(true);
+      setIsRevealed(true);
       return;
     }
 
-    // Step 1: Fade out load text after 1.2s
-    const textTimer = setTimeout(() => {
-      setIsTextFaded(true);
-    }, 1200);
+    // Step 1: Retract black curved mask & reveal elements
+    const openTimer = setTimeout(() => {
+      setIsOpeningRetracted(true);
+      setIsRevealed(true);
+    }, 250);
 
-    // Step 2: Trigger dismissal and arch curve after 1.5s
-    const dismissTimer = setTimeout(() => {
-      setIsDismissing(true);
+    // Step 2: Native rAF-driven scroll animation (fully reversible)
+    const handleScroll = () => {
+      if (scrollRafId.current) cancelAnimationFrame(scrollRafId.current);
 
-      const startTime = performance.now();
-      const duration = 850; // ms
+      scrollRafId.current = requestAnimationFrame(() => {
+        const scrollY = window.scrollY || window.pageYOffset;
+        const maxScrollDist = 650; // Distance to complete hero scroll progression
+        const progress = Math.min(1, Math.max(0, scrollY / maxScrollDist));
 
-      const animateCurve = (now) => {
-        const elapsed = now - startTime;
-        const rawP = Math.min(1, elapsed / duration);
-        const p = 1 - Math.pow(1 - rawP, 3);
-
-        const leftY = 1000 * (1 - p);
-        const rightY = 1000 * (1 - p);
-        const archHeight = 460 * Math.sin(rawP * Math.PI);
-        const controlY = leftY - archHeight;
-
-        if (pathRef.current) {
-          pathRef.current.setAttribute(
-            'd',
-            `M 0 0 L 1000 0 L 1000 ${rightY.toFixed(1)} Q 500 ${controlY.toFixed(1)} 0 ${leftY.toFixed(1)} Z`
-          );
+        // 1. Giant Name moves upward faster
+        if (titleRef.current) {
+          const titleY = -(progress * 150);
+          titleRef.current.style.transform = `translateY(${titleY}px)`;
         }
 
-        if (rawP < 1) {
-          requestAnimationFrame(animateCurve);
-        } else {
-          setIsPreloaderDone(true);
+        // 2. Portrait moves upward slower (parallax separation)
+        if (photoRef.current) {
+          const photoY = -(progress * 55);
+          photoRef.current.style.transform = `translateX(-50%) translateY(${photoY}px)`;
         }
-      };
 
-      requestAnimationFrame(animateCurve);
-    }, 1500);
-
-    // Guaranteed fallback: Unmount preloader after 2.6s
-    const fallbackTimer = setTimeout(() => {
-      setIsPreloaderDone(true);
-    }, 2600);
-
-    // Trigger card scroll reveal with IntersectionObserver
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsCardsVisible(true);
+        // 3. Left Information Panel (Progressive entrance from left)
+        if (leftCardRef.current) {
+          const leftOpacity = 0.2 + progress * 0.8;
+          const leftX = -35 * (1 - progress);
+          leftCardRef.current.style.opacity = `${leftOpacity}`;
+          leftCardRef.current.style.transform = `translateX(${leftX}px)`;
         }
-      },
-      { threshold: 0.15 }
-    );
 
-    if (cardsRef.current) {
-      observer.observe(cardsRef.current);
-    }
+        // 4. Right Information Panels (Progressive entrance from right)
+        if (rightCardRef.current) {
+          const rightOpacity = 0.2 + progress * 0.8;
+          const rightX = 35 * (1 - progress);
+          rightCardRef.current.style.opacity = `${rightOpacity}`;
+          rightCardRef.current.style.transform = `translateX(${rightX}px)`;
+        }
 
-    // Also trigger cards automatically 600ms after preloader opens
-    const cardTimer = setTimeout(() => {
-      setIsCardsVisible(true);
-    }, 2100);
+        // 5. Center Outlined Statement (Progressive vertical clarity)
+        if (centerTextRef.current) {
+          const textOpacity = 0.25 + progress * 0.75;
+          const textY = 40 * (1 - progress);
+          centerTextRef.current.style.opacity = `${textOpacity}`;
+          centerTextRef.current.style.transform = `translateY(${textY}px)`;
+        }
+
+        // 6. CTA Button (Reveals progressively later in scroll)
+        if (ctaBtnRef.current) {
+          const ctaProgress = Math.min(1, Math.max(0, (progress - 0.2) / 0.8));
+          const ctaOpacity = ctaProgress;
+          const ctaY = 25 * (1 - ctaProgress);
+          ctaBtnRef.current.style.opacity = `${ctaOpacity}`;
+          ctaBtnRef.current.style.transform = `translateY(${ctaY}px)`;
+        }
+      });
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll(); // Initial position calculation
 
     return () => {
-      clearTimeout(textTimer);
-      clearTimeout(dismissTimer);
-      clearTimeout(fallbackTimer);
-      clearTimeout(cardTimer);
-      if (cardsRef.current) observer.unobserve(cardsRef.current);
+      clearTimeout(openTimer);
+      window.removeEventListener('scroll', handleScroll);
+      if (scrollRafId.current) cancelAnimationFrame(scrollRafId.current);
     };
   }, []);
 
@@ -97,62 +101,33 @@ export default function Hero() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handlePreloaderClick = () => {
-    setIsPreloaderDone(true);
-    setIsCardsVisible(true);
-  };
-
   return (
     <>
       {/* ========================================================
-          1. CURVED SVG ARCH PRELOADER
+          1. OPENING BLACK CURVED MASK (RETRACTS UPWARD)
       ======================================================== */}
-      {!isPreloaderDone && (
-        <div 
-          className={`preloader ${isDismissing ? 'dismissed' : ''}`}
-          onClick={handlePreloaderClick}
-          aria-hidden="true"
-        >
-          <svg
-            className="preloader-svg"
-            viewBox="0 0 1000 1000"
-            preserveAspectRatio="none"
-          >
-            <path
-              ref={pathRef}
-              className="preloader-path"
-              d="M 0 0 L 1000 0 L 1000 1000 Q 500 1000 0 1000 Z"
-            />
-          </svg>
+      <div 
+        className={`opening-mask-container ${isOpeningRetracted ? 'retracted' : ''}`}
+        aria-hidden="true"
+      >
+        <div className="opening-curved-mask" />
+      </div>
 
-          <div className={`preloader-heading ${isTextFaded ? 'faded' : ''}`}>
-            <div className="load-text">
-              <span>A</span>
-              <span>N</span>
-              <span>U</span>
-              <span>&nbsp;&nbsp;</span>
-              <span>R</span>
-              <span>E</span>
-              <span>D</span>
-              <span>D</span>
-              <span>Y</span>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Header Navigation with Smooth Reveal */}
+      <Navbar isRevealed={isRevealed} />
 
-      {/* Header Navigation */}
-      <Navbar />
-
-      {/* Hero Banner Section */}
+      {/* Main Hero Banner Section */}
       <section className="banner-three-area" aria-label="Hero Banner">
         <div className="banner-container">
           <div className="banner-three-wrapper">
             
-            {/* Top Stage: Giant Title + Center Portrait */}
+            {/* Top Stage: Giant Name + Overlapping Centered Portrait */}
             <div className="banner-stage">
-              {/* Bust Portrait Cutout - Static and Anchored */}
-              <div className="banner-three-man">
+              {/* Centered Bust Portrait overlapping the typography */}
+              <div 
+                className={`banner-three-man ${isRevealed ? 'revealed' : ''}`} 
+                ref={photoRef}
+              >
                 <img
                   src="/anu-reddy-portrait.png"
                   alt="Anu Reddy"
@@ -160,13 +135,21 @@ export default function Hero() {
                 />
               </div>
 
-              {/* Giant Name Title across top */}
-              <h1 className="banner-three-title">
-                ANU REDDY
-              </h1>
+              {/* Masked Giant Title (Barlow Condensed 900) */}
+              <div className="banner-title-mask">
+                <h1 
+                  className={`banner-three-title ${isRevealed ? 'revealed' : ''}`} 
+                  ref={titleRef}
+                >
+                  ANU REDDY
+                </h1>
+              </div>
 
               {/* Clean Subtle Arc Line behind Portrait */}
-              <div className="banner-three-line-shape" aria-hidden="true">
+              <div 
+                className={`banner-three-line-shape ${isRevealed ? 'revealed' : ''}`} 
+                aria-hidden="true"
+              >
                 <svg viewBox="0 0 740 180" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path
                     d="M 10 160 Q 370 -20 730 160"
@@ -178,13 +161,10 @@ export default function Hero() {
               </div>
             </div>
 
-            {/* Bottom 3-Column Row with Smooth Fade-Up Scroll Animation */}
-            <div 
-              ref={cardsRef} 
-              className={`banner-three-wrap ${isCardsVisible ? 'animate-visible' : ''}`}
-            >
-              {/* 1. Left Card (Fade-up delay 200ms) */}
-              <div className="banner-three-left anim-card-left">
+            {/* Bottom 3-Column Content Row (Scroll-Driven Transformations) */}
+            <div className="banner-three-wrap">
+              {/* 1. Left Information Panel */}
+              <div className="banner-three-left" ref={leftCardRef}>
                 <h2 className="banner-three-left-title">
                   HI, I'M ANU REDDY <br />
                   <span>ELECTRONICS &amp; COMMUNICATION</span> <br />
@@ -216,20 +196,21 @@ export default function Hero() {
                 </div>
               </div>
 
-              {/* 2. Center Column (Fade-up delay 200ms) */}
-              <div className="banner-three-center anim-card-center">
+              {/* 2. Center Column: Outlined Statement & CTA */}
+              <div className="banner-three-center" ref={centerTextRef}>
                 <h3 className="banner-three-center-title">
                   DESIGNING AND DEVELOPING PRACTICAL DIGITAL EXPERIENCES, SOFTWARE SYSTEMS &amp; CREATIVE ENGINEERING.
                 </h3>
-                <div>
+                <div ref={ctaBtnRef}>
                   <a className="banner-explore-btn" href="#projects">
                     EXPLORE PROJECTS
+                    <span className="btn-dot" aria-hidden="true" />
                   </a>
                 </div>
               </div>
 
-              {/* 3. Right Card (Fade-up delay 300ms) */}
-              <div className="banner-three-right anim-card-right">
+              {/* 3. Right Information Panels */}
+              <div className="banner-three-right" ref={rightCardRef}>
                 <div className="counter-item">
                   <h4 className="counter-title">6+</h4>
                   <p className="counter-paragraph">Live Production &amp; Academic Projects</p>
