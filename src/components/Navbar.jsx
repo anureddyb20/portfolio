@@ -2,12 +2,12 @@
 
 import React, { useState } from 'react';
 
-export default function Navbar({ isRevealed = true }) {
+export default function Navbar() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   return (
     <>
-      <header className={`header-area ${isRevealed ? 'revealed' : ''}`}>
+      <header className="header-area">
         <div className="header-container">
           {/* Boxed Logo Card matching reference */}
           <a href="#" className="header-logo-card">
@@ -52,7 +52,7 @@ export default function Navbar({ isRevealed = true }) {
         </div>
       </header>
 
-      {/* Offcanvas Drawer - Rendered only when active */}
+      {/* Offcanvas Drawer - Only rendered when active */}
       {isDrawerOpen && (
         <div 
           className="offcanvas-overlay"
